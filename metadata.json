@@ -1,0 +1,6 @@
+{
+  "name": "#StopEbolaRDC - Générateur de Visuel",
+  "description": "Générateur de visuels d'engagement pour la campagne d'engagement contre Ebola en RDC. Importez votre photo, ajustez le cadrage, puis téléchargez ou partagez votre visuel avec le filtre officiel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
