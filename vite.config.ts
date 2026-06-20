@@ -9,7 +9,6 @@ const __dirname = path.dirname(__filename);
 
 export default defineConfig(() => {
   return {
-    // Important pour GitHub Pages
     base: '/ebola-engagement-rdc/',
 
     plugins: [react(), tailwindcss()],
@@ -18,6 +17,10 @@ export default defineConfig(() => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
+    },
+
+    build: {
+      assetsInlineLimit: 10 * 1024 * 1024,
     },
 
     server: {
