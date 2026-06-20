@@ -117,57 +117,17 @@ Je viens de créer mon filtre d'engagement. Vous aussi, créez le vôtre et part
 ✅ Invitons chacun à protéger sa famille et sa communauté
 
 Créez votre filtre ici :
-https://stopebolardc-g-n-rateur-de-visuel-243346760642.europe-west2.run.app
+https://obedmuhindo.github.io/ebola-engagement-rdc/
 
 #StopEbolaRDC
 Prévenons. Protégeons. Agissons.`;
 
-  // Charge et convertit le filtre en Base64 au démarrage pour éviter les erreurs CORS
+  // Charge le filtre officiel depuis les assets bundlés par Vite.
+  // Important : on évite le fetch + cache-busting ici, car cela peut créer un canvas "tainted"
+  // dans certains navigateurs avec les anciennes versions en cache.
   useEffect(() => {
-    const loadFilter = async () => {
-      try {
-        const absoluteUrl = new URL(ASSETS.filter, window.location.href).href + '?cors_cb=' + Date.now();
-        const response = await fetch(absoluteUrl);
-        if (!response.ok) throw new Error("HTTP error " + response.status);
-        const blob = await response.blob();
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setFilterDataUrl(reader.result as string);
-          setFilterLoaded(true);
-        };
-        reader.readAsDataURL(blob);
-      } catch (error) {
-        console.warn("Erreur de chargement via fetch, fallback via objet Image...", error);
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = ASSETS.filter + '?cors_cb=' + Date.now();
-        img.onload = () => {
-          try {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.naturalWidth || img.width;
-            canvas.height = img.naturalHeight || img.height;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.drawImage(img, 0, 0);
-              const dataUrl = canvas.toDataURL('image/png');
-              setFilterDataUrl(dataUrl);
-              setFilterLoaded(true);
-              return;
-            }
-          } catch (canvasErr) {
-            console.error("Échec de la conversion canvas temporaire :", canvasErr);
-          }
-          setFilterDataUrl(ASSETS.filter);
-          setFilterLoaded(true);
-        };
-        img.onerror = () => {
-          // Si même l'image directe échoue, on utilise le chemin relatif direct
-          setFilterDataUrl(ASSETS.filter);
-          setFilterLoaded(true);
-        };
-      }
-    };
-    loadFilter();
+    setFilterDataUrl(ASSETS.filter);
+    setFilterLoaded(true);
   }, []);
 
   // Empêche le défilement de l'écran mobile lors du drag & drop
@@ -253,57 +213,36 @@ Prévenons. Protégeons. Agissons.`;
     setPosY(0);
   };
 
-  // Utilitaire ultra-robuste pour charger des images sans tacher le canvas (prevents tainted canvas SecurityError)
-  const getCorsFriendlyUrl = (url: string): string => {
-    if (!url || url.startsWith('data:')) return url;
-    const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}cors_cb=${Date.now()}`;
-  };
-
+  // Charge une image sans polluer le canvas.
+  // Les images utilisateur sont en Data URL et les assets Vite sont servis depuis le même domaine GitHub Pages.
+  // On évite donc crossOrigin + cache-busting, qui peuvent provoquer des SecurityError avec certains caches Chrome.
   const loadImageSafely = (src: string): Promise<HTMLImageElement> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      const isDataUrl = src.startsWith('data:');
-      
-      // Toujours définir crossOrigin sur anonymous pour les images chargées sur canvas
-      if (!isDataUrl) {
-        img.crossOrigin = 'anonymous';
+    return new Promise((resolve, reject) => {
+      if (!src) {
+        reject(new Error("Source d'image vide."));
+        return;
       }
-      
-      const targetSrc = isDataUrl ? src : getCorsFriendlyUrl(src);
-      
-      let resolved = false;
-      const done = (isSuccess: boolean) => {
-        if (!resolved) {
-          resolved = true;
-          if (isSuccess && img.naturalWidth > 0) {
-            resolve(img);
-          } else {
-            console.warn("Échec ou timeout du chargement de l'image (utilisation de secours) :", src.substring(0, 50));
-            // En secours ultime, si crossOrigin bloque, on retente sans restriction CORS
-            if (!isDataUrl && img.crossOrigin === 'anonymous') {
-              const retryImg = new Image();
-              retryImg.onload = () => resolve(retryImg);
-              retryImg.onerror = () => resolve(retryImg);
-              retryImg.src = src;
-              return;
-            }
-            resolve(img);
-          }
+
+      const img = new Image();
+      img.decoding = 'async';
+
+      img.onload = () => {
+        if ((img.naturalWidth || img.width) > 0 && (img.naturalHeight || img.height) > 0) {
+          resolve(img);
+        } else {
+          reject(new Error("Image chargée mais dimensions invalides."));
         }
       };
-      
-      img.onload = () => done(true);
-      img.onerror = () => done(false);
-      img.src = targetSrc;
-      
-      // Si déjà prêt
-      if (img.complete && img.naturalWidth > 0) {
-        done(true);
+
+      img.onerror = () => {
+        reject(new Error("Impossible de charger l'image : " + src.substring(0, 80)));
+      };
+
+      img.src = src;
+
+      if (img.complete && (img.naturalWidth || img.width) > 0) {
+        resolve(img);
       }
-      
-      // Timeout de sécurité de 4 secondes
-      setTimeout(() => done(false), 4000);
     });
   };
 
@@ -394,7 +333,7 @@ Prévenons. Protégeons. Agissons.`;
   // Téléchargement du fichier unique index.html pour GitHub
   const handleDownloadSingleHtml = async () => {
     try {
-      const response = await fetch('/index_github.html');
+      const response = await fetch(new URL('index_github.html', window.location.href).href);
       if (!response.ok) {
         throw new Error("Le fichier index_github.html n'a pas pu être chargé.");
       }
@@ -551,7 +490,6 @@ Prévenons. Protégeons. Agissons.`;
           <img 
             src={logoSrc} 
             alt="Logo du Ministère de la Santé" 
-            crossOrigin="anonymous"
             className="h-14 md:h-16 object-contain relative z-10" 
             onError={() => {
               // Activer le fallback officiel si la bannière est corrompue/manquante
